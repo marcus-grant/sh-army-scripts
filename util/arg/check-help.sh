@@ -36,8 +36,9 @@ RETURNCODES:
     4       Invalid control argument given for this script.
 
 Examples:
-    Check all arguments for help flags (all default control options for script):
-        util/arg/check-help.sh -- "$@"
+    Check all arguments for help flags (all default control options for script),
+        and exit with code 0 if found:
+            util/arg/check-help.sh -- "$@" || exit 0
     
     Check 2nd, 3rd & 4th args for help flags with custom usage message if found:
         util/arg/check-help.sh -u "Custom usage message!" -s 2 -e 4 -- "$@"
@@ -110,13 +111,13 @@ while [[ $# -gt 0 ]]; do
             shift
             end=$1
             ;;
-        -o)
+        -o|--short)
             shift
-            short_flag=$1
+            short_flag="-${1}"
             ;;
-        -O)
+        -O|--long)
             shift
-            long_flag=$1
+            long_flag="--${1}"
             ;;
         --)
             shift
@@ -144,20 +145,16 @@ fi
 
 # Now we can finally check for the help flag in either long_flag or short_flag
 # ... in the rest of the arguments past the delimiter
-shift # first to ignore the command name as an argument
-for (( i=start; i<=end; i++ )); do
+i=$start
+# echo "i: $i, end: $end, \$#: $#" # DEBUG
+while [[ "$i" -le "$end" ]] && [[ $i -le $# ]]; do
     arg=${!i}
-    # Exit early if i is greater than the number of arguments
-    if [[ "$i" -gt "$#" ]]; then
-        break
-    fi
     # If debug print arg and index
     if [[ "$debug" == "true" ]] ; then
         echo "arg: $arg"
         echo "i: $i"
     fi
-    if [[ "${arg}" == "-${short_flag}" ]] || [[ "${arg}" == "--${long_flag}" ]];
-    then
+    if [[ "${arg}" == "${short_flag}" ]] || [[ "${arg}" == "${long_flag}" ]]; then
         # If usage message is non-empty, print it
         if [[ -n "${usage_msg}" ]]; then
             echo
@@ -169,6 +166,7 @@ for (( i=start; i<=end; i++ )); do
         fi
         exit 1
     fi
+    i=$(( i + 1 ))
 done
 
 # Done, no help flag found
