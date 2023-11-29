@@ -94,3 +94,94 @@
   * Regularly review your scripts for...
     * Potential improvements.
     * Refactor when necessary.
+
+## Approaches to Common Entrypoint to Script
+
+Creating a collection of reusable Bash scripts that can be easily called from
+the command line, similar to a utility library like lodash, is a great idea.
+To achieve this without placing all scripts in
+a flat directory and modifying the `PATH`, you can consider a few approaches:
+
+### 1. Structured Directory with a Central Dispatcher Script
+
+* **Directory Structure**:
+  * Organize your scripts into a structured directory.
+  * Group them by functionality or purpose.
+
+* **Dispatcher Script**:
+  * Create a central dispatcher or launcher script at
+    the root of this structure.
+  * This script can call other scripts based on input parameters.
+
+* **Example**:
+
+  ```bash
+  mytools.sh file clean  # Calls the 'clean' script in the 'file' category
+  ```
+
+* **Advantages**: This approach keeps your script organization clean and allows easy expansion. It also avoids cluttering the `PATH`.
+
+### 2. Sourcing Scripts from a Common Entry Point
+
+* **Common Entry Point**:
+  * Have a main script that sources other scripts.
+  * This main script can be the only one in your `PATH`.
+
+* **Sourcing**:
+  * The main script sources other scripts as needed.
+  * These scripts can be organized in a structured directory hierarchy.
+
+* **Example**:
+
+  ```bash
+  # In main.sh
+  source "${SCRIPT_ROOT}/utils/file_operations.sh"
+  ```
+
+* **Advantages**:
+  * This method allows for modular script organization and
+    keeps the global namespace clean.
+
+### 3. Creating Aliases or Shell Functions
+
+* **Aliases/Functions**:
+  * In your `.bashrc` or `.bash_profile`,
+    create aliases or functions that point to your scripts.
+
+* **Example**:
+
+  ```bash
+  alias clean_files='/path/to/scripts/file_operations/clean.sh'
+  ```
+
+* **Advantages**:
+  * Easy to set up and use,
+    but can become unmanageable with a large number of scripts.
+
+### 4. Using Symbolic Links in a Bin Directory
+
+* **Symbolic Links**: Create symbolic links to your scripts in a directory that is in your `PATH`.
+
+* **Example**:
+
+  ```bash
+  ln -s /path/to/scripts/file_operations/clean.sh /usr/local/bin/clean_files
+  ```
+
+* **Advantages**: Keeps the scripts organized in their original location while making them accessible from anywhere.
+
+### 5. Packaging Scripts as a Shell Library
+
+* **Shell Library**: Package your scripts as a shell library, which can be sourced in other scripts or interactive shells.
+
+* **Example**:
+
+  ```bash
+  source '/path/to/mylib.sh'
+  ```
+
+* **Advantages**: Similar to sourcing scripts, but more formalized and easier to distribute or share.
+
+### Conclusion
+
+Each of these methods has its advantages and can be suited to different scenarios. The best choice depends on factors like the number of scripts, their complexity, and how you intend to use them. For ease of use and scalability, a structured directory with a central dispatcher script or a shell library approach might be most effective.
