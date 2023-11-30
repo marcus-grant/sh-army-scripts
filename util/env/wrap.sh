@@ -32,6 +32,15 @@ EOF
 # Check for -h or --help in arguments, print usage if so and exit successfully
 util/arg/check-help.sh -u "$USAGE" -- "${@}" || exit 0
 
+# Check for debug flag in first arg
+DEBUG=false
+if [[ "${1}" == "-d" ]] || [[ "${1}" == "--debug" ]]; then
+    DEBUG=true
+    shift
+    echo
+    echo "DEBUG Mode in $0!"
+fi
+
 # Check for at least 2 arguments, if not print error and usage
 ERR_MSG="ERROR in $0: Command to wrap and/or environment file is missing!"
 util/arg/check-num.sh -m 2 -u "$USAGE" -e "$ERR_MSG" -- "${@}" || exit 2
@@ -39,6 +48,7 @@ util/arg/check-num.sh -m 2 -u "$USAGE" -e "$ERR_MSG" -- "${@}" || exit 2
 # Check if variable file exists
 var_file="${1}"
 shift
+$DEBUG && echo; echo "var_file: ${var_file}" # Debug mode for var_file
 ERR_MSG="\nERROR in $0: Variable file (${var_file}) not found!\n\n$USAGE"
 [ -f "${var_file}" ] || { echo -e "$ERR_MSG" >&2; exit 1; }
 
@@ -51,8 +61,10 @@ ERR_MSG="\nERROR in $0: Variable file (${var_file}) not found!\n\n$USAGE"
 set -a  # Automatically export all variables
 # shellcheck disable=SC1090
 source "$var_file"
+$DEBUG && echo; echo "var_file: ${var_file}" # Debug mode for var_file
 set +a  # Stop automatically exporting variables
 
 # Execute the command with the remaining arguments
+$DEBUG && echo; echo "command: ${*}"
 "$@"
 exit $?
