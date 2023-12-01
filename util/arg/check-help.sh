@@ -1,15 +1,18 @@
 #!/bin/bash
 USAGE=$(cat << 'EOF'
 USAGE:
-    check-help.sh [-h|--help] [-D|--debug] [-u|--usage msg] \\
-                    [-s|--start start] [-e|--end end] \\
-                    [-o short_opt] [-O long_opt] -- [arguments...]
+    check-help.sh [-h|--help] [-D|--debug] [-u|--usage MSG] \\
+                    [-s|--start START] [-e|--end END] \\
+                    [-f|--short SHORT] [-F|--long LONG] -- [ARGS...]
 
 DESCRIPTION:
     Checks for -h or --help in the given arguments.
     The goal of this script is to reduce the amount of usage message boilerplate.
-    The only necessary arguments are the usage message and the delimiter between
-    control arguments and positional arguments.
+    The only necessary arguments are the -- delimiter which marks the end of
+    control arguments and data arguments to search for help flags in.
+    This uses util/arg/check-flag.sh to check for the help flag.
+    But adds functionality by allowing the user to specify a -u|--usage message
+    to print if the help flag is found.
 
 ARGUMENTS:
     -h, --help          Print THIS scripts usage message.
@@ -17,20 +20,19 @@ ARGUMENTS:
     -u, --usage msg     Custom usage message to display when help flag is found.
     -s, --start start   The starting index of the range to check (default 1).
     -e, --end   end       The ending index of the range to check (default $#).
-    -o, --short option  Specify a custom short help flag other than
-                            "-h" to search for after the "--" delimiter.
-    -O, --long  option  Specify a custom short help flag other than
-                            "-h" to search for after the "--" delimiter.
+    -f, --short SHORT  Specify a custom short help flag to find after the "--"
+                            (default -h).
+    -O, --long  option  Specify a custom long help flag to find after the "--"
+                            (default --help)
     -- (REQUIRED)       Delimiter indicating the end of control arguments.
                             Args to check for help flags start after here.
-    arguments           The arguments to check for help flags,
-                            like a calling scripts \$@.
+    ARGS...           The arguments to check for help flags in.
 
 RETURNCODES:
     (SIGNALS)
-    0       Help flag NOT found (continue execution in calling script).
-    1       Help flag found.
-    2       Help flag found for this script (i.e., not for the passed args).
+    0       Help flag found.
+    1       Help flag NOT found (continue execution in calling script).
+    2       Help flag found in control args (i.e., print usage for this script).
     (ERRORS)
     3       No -- delimiter found in this script!
     4       Invalid control argument given for this script.
@@ -38,88 +40,74 @@ RETURNCODES:
 Examples:
     Check all arguments for help flags (all default control options for script),
         and exit with code 0 if found:
-            util/arg/check-help.sh -- "$@" || exit 0
+            check-help.sh -- "$@" && exit 0
     
     Check 2nd, 3rd & 4th args for help flags with custom usage message if found:
-        util/arg/check-help.sh -u "Custom usage message!" -s 2 -e 4 -- "$@"
+        check-help.sh -u "Custom usage message!" -s 2 -e 4 -- "$@" && exit 0
     
     Check all all passed args for help flags with custom message,
-        and non-default help flags --usage and -u:
-        util/arg/check-help.sh -u "Custom usage message!" -o u -O usage -- "$@"
+    and non-default help flags --usage and -u:
+        check-help.sh -u "Custom usage message!" -f -u -F --usage -- "$@"
 
 EOF
 )
 
-# Check for -h or --help before the delimiter
-for (( i=1; i<=$#; i++ )); do
-    arg=${!i}
-    if [[ "${arg}" == "-h" ]] || [[ "${arg}" == "--help" ]]; then
-        echo
-        echo "$USAGE"
-        exit 2
-    fi
-    if [[ "${arg}" == "--" ]]; then
-        break
-    fi
-done
+# Check for -h or --help before the delimiter (assuming within 2 args)
+util/arg/check-flag.sh -h,--help 2 -- "${@}" && { echo "$USAGE"; exit 2; }
 
-# If no help if found before delimiter (--),
-# delimiter must exist in this scripts args
-delim_idx=0
-for (( i=1; i<=$#; i++ )); do
-    arg=${!i}
-    if [[ "${arg}" == "--" ]]; then
-        delim_idx=$i
-        break
-    fi
-done
-if [[ "${delim_idx}" -eq 0 ]]; then
-    echo
-    echo "No '--' delimiter found in check-help.sh script!" >&2
-    echo
-    echo "$USAGE" >&2
-    exit 3
-fi
-
-
-# Default values for control arguments
-usage_msg=""
-start=1
-end=$#
-short_flag="-h"
-long_flag="--help"
-debug="false"
+# If you're here, then we can stop worrying about help flags as control args.
+# So we can start checking all other control arguments before the -- delimiter.
+# Start by setting default values for control arguments
+USAGE_MSG=""
+START=1
+END=0 # 0 is a marker for no end specified, we'll change this to $# later
+SHORT_FLAG="-h"
+LONG_FLAG="--help"
+DEBUG="false"
 
 # Check for control arguments and override defaults if found
 # First check for a non-default usage message and stop if 
 # Iterate through the arguments
 while [[ $# -gt 0 ]]; do
-    delim_idx=$(( delim_idx + 1 ))
-    case $1 in
+    arg="${1}"
+    shift
+    if [[ $DEBUG == "true" ]]; then
+        echo "(while)arg: $arg"
+        echo "(while)\$#: $#"
+        echo "(while)\$@: ${*}"
+    fi
+    case $arg in
         -D|--debug)
-            debug="true"
+            if [[ "$DEBUG" == "true" ]]; then echo "(case -D)arg: true"; fi
+            DEBUG="true"
             ;;
         -u|--usage)
+            if [[ "$DEBUG" == "true" ]]; then echo "(case -u)arg: $1"; fi
+            USAGE_MSG="${1}"
             shift
-            usage_msg=$1
             ;;
         -s|--start)
+            if [[ "$DEBUG" == "true" ]]; then echo "(case -s)arg: $1"; fi
+            START="${1}"
             shift
-            start=$1
             ;;
         -e|--end)
+            if [[ "$DEBUG" == "true" ]]; then echo "(case -e)arg: $1"; fi
+            END="${1}"
             shift
-            end=$1
             ;;
-        -o|--short)
+        -f|--short)
+            if [[ "$DEBUG" == "true" ]]; then echo "(case -f)arg: $1"; fi
+            SHORT_FLAG="${1}"
             shift
-            short_flag="-${1}"
             ;;
-        -O|--long)
+        -F|--long)
+            if [[ "$DEBUG" == "true" ]]; then echo "(case -F)arg: $1"; fi
+            LONG_FLAG="${1}"
             shift
-            long_flag="--${1}"
             ;;
         --)
+            if [[ "$DEBUG" == "true" ]]; then echo "(case --): delim found!"; fi
             shift
             break
             ;;
@@ -129,48 +117,56 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
     esac
-    shift
 done
 
+# Validate the control arguments
+if ! [[ "$END" =~ ^[0-9]+$ ]] ; then # Validate END is a number
+    echo "ERROR in $0: END argument ($END), is not a number!" >&2
+    echo "$USAGE" >&2
+    exit 4
+fi
+if ! [[ "$START" =~ ^[0-9]+$ ]] ; then # Validate START is a number
+    echo "ERROR in $0: START argument ($START), is not a number!" >&2
+    echo "$USAGE" >&2
+    exit 4
+fi
+if [[ "$END" -eq 0 ]]; then # END=0 wasn't overriden, set to $# after shifts
+    END="$#"
+fi
+if [[ "$END" -lt "$START" ]] ; then # Validate END >= START
+    echo "ERROR in $0: END arg ($END), is less than START arg ($START)!" >&2
+    echo "$USAGE" >&2
+    exit 4
+fi
+
 # DEBUG: All overridden values
-if [[ "$debug" == "true" ]] ; then
-    echo "usage_msg: $usage_msg"
-    echo "start: $start"
-    echo "end: $end"
-    echo "short_flag: $short_flag"
-    echo "long_flag: $long_flag"
+if [[ "$DEBUG" == "true" ]] ; then
+    echo "DEBUG: All control arg values:"
+    echo "USAGE_MSG: $USAGE_MSG"
+    echo "START: $START"
+    echo "END: $END"
+    echo "SHORT_FLAG: $SHORT_FLAG"
+    echo "LONG_FLAG: $LONG_FLAG"
     echo "\$@: ${*}"
     echo "\$#: $#"
 fi
 
-# Now we can finally check for the help flag in either long_flag or short_flag
-# ... in the rest of the arguments past the delimiter
-i=$start
-# echo "i: $i, end: $end, \$#: $#" # DEBUG
-while [[ "$i" -le "$end" ]] && [[ $i -le $# ]]; do
-    arg=${!i}
-    # If debug print arg and index
-    if [[ "$debug" == "true" ]] ; then
-        echo "arg: $arg"
-        echo "i: $i"
-    fi
-    if [[ "${arg}" == "${short_flag}" ]] || [[ "${arg}" == "${long_flag}" ]]; then
-        # If usage message is non-empty, print it
-        if [[ -n "${usage_msg}" ]]; then
-            echo
-            echo "$usage_msg"
-        fi
-        # If debug is true, print debug info
-        if [[ "$debug" == "true" ]] ; then
-            echo "Found help flag, exiting with code 1."
-        fi
-        exit 1
-    fi
-    i=$(( i + 1 ))
-done
 
-# Done, no help flag found
-if [[ "$debug" == "true" ]] ; then
-    echo "No help flag found, exiting with code 0."
+# Use util/arg/check-flag.sh to check for the help flag using the control args
+util/arg/check-flag.sh "${SHORT_FLAG},${LONG_FLAG}" "$END" "$START" -- "${@}"
+RESULT=$?
+$DEBUG && echo "RESULT: $RESULT" # DEBUG
+
+# This check script is meant to cut down on boilerplate usage message code.
+# So if no help flag found $? == 1, continue executing in calling script.
+# For example check-help.sh -u "USAGE MESSAGE" -- "$@" && exit 0
+if [[ $RESULT -ne "0" ]]; then exit 1; fi # Flag not found, exit with code 1 
+
+# If help flag not found check if a USAGE message was given, if so print it
+if [[ -n "$USAGE_MSG" ]]; then
+    echo
+    echo "$USAGE_MSG"
 fi
+
+# Then finally exit with code 0
 exit 0
