@@ -33,23 +33,23 @@ EXAMPLE:
         KOPIA_PATH="~/Archive/kopia"
     
     Now its possible to quickly run kopia commands with the above credentials:
-        $0 ~/.restic/repos/kopia.env snapshot list
+        $0 ~/.restic/repos/kopia.env
 
 
 EOF
 )
 
 # Check for -h or --help in arguments, print usage if so and exit successfully
-util/arg/check-help.sh -e 2 -u "$USAGE" -- "${@}" || exit 0
-
-# DELETEME: Don't think we'll be making this one wrap the whole command chain
-# Check for at least 2 arguments, if not print error and usage
-# ERR_MSG="ERROR in $0: Command to wrap and/or environment file is missing!"
-# util/arg/check-num.sh -m 2 -u "$USAGE" -e "$ERR_MSG" -- "${@}" || exit 2
+util/arg/check-help.sh -u "$USAGE" -- "${@}" && exit 0
 
 # Pull out the environment file
 env_file="${1}"
 # echo "env_file: ${env_file}" # DEBUG
+if [ ! -f "$env_file" ]; then
+    echo "ERROR in $0: Variable file (${env_file}) not found!" >&2
+    echo "$USAGE" >&2
+    exit 1
+fi
 shift
 
 # Pull out the kopia subcommand and arguments
