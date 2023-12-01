@@ -59,7 +59,7 @@ util/arg/check-flag.sh -h,--help 2 -- "${@}" && { echo "$USAGE"; exit 2; }
 # So we can start checking all other control arguments before the -- delimiter.
 # Start by setting default values for control arguments
 USAGE_MSG=""
-START=1
+START=0
 END=0 # 0 is a marker for no end specified, we'll change this to $# later
 SHORT_FLAG="-h"
 LONG_FLAG="--help"
@@ -108,7 +108,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --)
             if [[ "$DEBUG" == "true" ]]; then echo "(case --): delim found!"; fi
-            shift
+            if [[ "$DEBUG" == "true" ]]; then echo "(AFTER arg loop)\$@: $@"; fi
             break
             ;;
         *)
